@@ -37,12 +37,24 @@ class _MessageListState extends State<MessageList> {
         itemCount: _message.length,
         itemBuilder: (context, index){
           RemoteMessage message = _message[index];
-          return ListTile(
-            title: Text(message.messageId ?? 'no RemoteMessage.messageId available'),
-            subtitle: Text(message.sentTime?.toString() ?? DateTime.now().toString()),
-            onTap: () => {
-              Navigator.pushNamed(context, '/message', arguments: MessageArguments(message, false))
-            },
+          return Dismissible(
+            background: Container(
+              color: Colors.red,
+            ),
+              key: ValueKey<RemoteMessage>(_message[index]),
+              onDismissed: (DismissDirection direction){
+                setState(() {
+                  _message.removeAt(index);
+                });
+              },
+              child: ListTile(
+                title: Text(message.messageId ?? 'no RemoteMessage.messageId available'),
+                subtitle: Text(message.sentTime?.toString() ?? DateTime.now().toString()),
+
+                onTap: () => {
+                  Navigator.pushNamed(context, '/message', arguments: MessageArguments(message, false))
+                },
+              )
           );
         }
     );

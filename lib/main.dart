@@ -204,6 +204,11 @@ class MetaCard extends StatelessWidget{
                 child: Text(_title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
               ),
               const Divider(thickness: 1, color: Colors.black,),
+              Container(
+                alignment: Alignment.topLeft,
+                child: const Text('Swipe for remove list', style: TextStyle(fontSize: 12),),
+              ),
+              const SizedBox(height: 10,),
               _children,
             ],
           ),
