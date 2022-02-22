@@ -23,7 +23,7 @@ class MessageView extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$title'),
+          Text(title),
           Expanded(child: Text(value ?? 'N/A')),
         ],
       ),

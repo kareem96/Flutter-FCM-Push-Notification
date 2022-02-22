@@ -1,14 +1,12 @@
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'firebase_config.dart';
 import 'message.dart';
-
-///
-late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
-late AndroidNotificationChannel channel;
+import 'message_list.dart';
 
 
 ///
@@ -19,26 +17,56 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async{
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-        apiKey: 'AAAAx2TixGU:APA91bGmSmv5jmRm76O9RClEONv-exlYBDayVxycHt1dvb46wIkZ6AgaT9uBw9unUMXl8tDZlGlayQKi_GEC1G5aYQ6QXCuA21DmnQNtSA7yNmlSTLkLDGQUXbWkpaUOKpd34wkQ-BVW',
-        appId: '1:856391074917:android:591cfd088c25803377f28c',
-        messagingSenderId: '856391074917',
-        projectId: 'flutterfcm-34760',
-    )
-  );
-  flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  await flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(channel);
+  try{
+    await Firebase.initializeApp(options: DefaultFirebaseConfig.platformOptions);
+  }catch(e){}
 
-  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp( MyApp());
 }
 
-
+Future<void> onActionSelected(String value) async {
+  switch (value) {
+    case 'subscribe':
+      {
+        print(
+          'FlutterFire Messaging Example: Subscribing to topic "fcm_test".',
+        );
+        await FirebaseMessaging.instance.subscribeToTopic('fcm_test');
+        print(
+          'FlutterFire Messaging Example: Subscribing to topic "fcm_test" successful.',
+        );
+      }
+      break;
+    case 'unsubscribe':
+      {
+        print(
+          'FlutterFire Messaging Example: Unsubscribing from topic "fcm_test".',
+        );
+        await FirebaseMessaging.instance.unsubscribeFromTopic('fcm_test');
+        print(
+          'FlutterFire Messaging Example: Unsubscribing from topic "fcm_test" successful.',
+        );
+      }
+      break;
+    case 'get_apns_token':
+      {
+        if (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS) {
+          print('FlutterFire Messaging Example: Getting APNs token...');
+          String? token = await FirebaseMessaging.instance.getAPNSToken();
+          print('FlutterFire Messaging Example: Got APNs token: $token');
+        } else {
+          print(
+            'FlutterFire Messaging Example: Getting an APNs token is only supported on iOS and macOS platforms.',
+          );
+        }
+      }
+      break;
+    default:
+      break;
+  }
+}
 
 class MyApp extends StatelessWidget {
   MyApp({Key? key}) : super(key: key);
@@ -51,15 +79,15 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       routes: {
-        '/': (context) => MyHomePage(title: '',),
-        '/message': (context) => MessageView(),
+        '/': (context) => MyHomePage(title: 'Flutter FCM',),
+        '/message': (context) => const MessageView(),
       },
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+  MyHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
@@ -68,49 +96,44 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  late FirebaseMessaging messaging;
   String? token;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+    messaging = FirebaseMessaging.instance;
+    messaging.getToken().then((value) => {
+      debugPrint(value),
+    });
+    // messaging.subscribeToTopic(token.toString());
+    messaging.subscribeToTopic("flutterFCM");
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
       if(message != null){
         Navigator.pushNamed(context, '/message', arguments: MessageArguments(message, true));
       }
     });
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      RemoteNotification? notifications = message.notification;
-      AndroidNotification? android = message.notification?.android;
-      if(notifications != null && android != null){
-        flutterLocalNotificationsPlugin.show(
-            notifications.hashCode,
-            notifications.title,
-            notifications.body,
-            NotificationDetails(
-              android:AndroidNotificationDetails(
-                channel.id,
-                channel.name,
-                channel.description,
-                icon: 'launch_background',
-              )
-            )
-        );
-      }
-    });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('A new onMessageOpenedApp event was published');
+      showDialog(
+          context: context,
+          builder: (BuildContext context){
+            return AlertDialog(
+              title: const Text('Notification'),
+              content: Text(message.notification!.body!),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Okay')
+                )
+              ],
+            );
+          }
+      );
       Navigator.pushNamed(context, '/message', arguments: MessageArguments(message, true));
-
-    });
-  }
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
     });
   }
 
@@ -119,26 +142,75 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        /*actions: [
+          PopupMenuButton(
+            onSelected: onActionSelected,
+            itemBuilder: (BuildContext context) {
+              return [
+                const PopupMenuItem(
+                  value: 'subscribe',
+                  child: Text('Subscribe to topic'),
+                ),
+                const PopupMenuItem(
+                  value: 'unsubscribe',
+                  child: Text('Unsubscribe to topic'),
+                ),
+                const PopupMenuItem(
+                  value: 'get_apns_token',
+                  child: Text('Get APNs token (Apple only)'),
+                ),
+              ];
+            },
+          ),
+        ],*/
       ),
-      body: Center(
+      body: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
+          children: [
+            // MetaCard('Permission', Permissions()),
+            // MetaCard('_title', Token)
+            MetaCard('Message Stream', const MessageList()),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: (){},
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class MetaCard extends StatelessWidget{
+  final String _title;
+  final Widget _children;
+
+  MetaCard(this._title, this._children);
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(left: 8, right: 8, top: 8),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: Text(_title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+              ),
+              const Divider(thickness: 1, color: Colors.black,),
+              _children,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
 }
