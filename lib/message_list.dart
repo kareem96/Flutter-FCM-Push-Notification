@@ -46,6 +46,7 @@ class _MessageListState extends State<MessageList> {
                 setState(() {
                   _message.removeAt(index);
                 });
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('item dismissed')));
               },
               child: ListTile(
                 title: Text(message.messageId ?? 'no RemoteMessage.messageId available'),
